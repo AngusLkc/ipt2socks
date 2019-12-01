@@ -6,7 +6,6 @@
 #include <stdbool.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include <sys/resource.h>
 #include <uv.h>
 #undef _GNU_SOURCE
 
@@ -54,9 +53,6 @@ typedef struct {
 typedef struct sockaddr     skaddr_t;
 typedef struct sockaddr_in  skaddr4_t;
 typedef struct sockaddr_in6 skaddr6_t;
-
-/* setsockopt(SO_KEEPALIVE) */
-void set_keepalive(int sockfd);
 
 /* setsockopt(IPV6_V6ONLY) */
 void set_ipv6_only(int sockfd);
@@ -140,7 +136,7 @@ void parse_ipv6_addr(const skaddr6_t *addr, char *ipstr, portno_t *portno);
 int get_ipstr_family(const char *ipstr);
 
 /* set nofile limit (may require root privileges) */
-void set_nofile_limit(rlim_t nofile);
+void set_nofile_limit(size_t nofile);
 
 /* run the current process with a given user */
 void run_as_user(const char *username, char *const argv[]);

@@ -5,9 +5,9 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include <sys/types.h>
 #include <arpa/inet.h>
-#include <netinet/tcp.h>
+#include <sys/types.h>
+#include <sys/resource.h>
 #include <linux/limits.h>
 #include <pwd.h>
 #include <grp.h>
@@ -29,32 +29,8 @@
 #define IPV6_RECVORIGDSTADDR 74
 #endif
 
-#define KEEPALIVE_CONN_IDLE_SEC 15
-#define KEEPALIVE_RETRY_MAX_COUNT 5
-#define KEEPALIVE_RETRY_INTERVAL_SEC 1
-
 /* suppress the warning of openwrt */
 int initgroups(const char *user, gid_t group);
-
-/* setsockopt(SO_KEEPALIVE) */
-void set_keepalive(int sockfd) {
-    if (setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &(int){1}, sizeof(int))) {
-        LOGERR("[set_keepalive] setsockopt(%d, SO_KEEPALIVE): (%d) %s", sockfd, errno, errstring(errno));
-        exit(errno);
-    }
-    if (setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE, &(int){KEEPALIVE_CONN_IDLE_SEC}, sizeof(int))) {
-        LOGERR("[set_keepalive] setsockopt(%d, TCP_KEEPIDLE): (%d) %s", sockfd, errno, errstring(errno));
-        exit(errno);
-    }
-    if (setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPCNT, &(int){KEEPALIVE_RETRY_MAX_COUNT}, sizeof(int))) {
-        LOGERR("[set_keepalive] setsockopt(%d, TCP_KEEPCNT): (%d) %s", sockfd, errno, errstring(errno));
-        exit(errno);
-    }
-    if (setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL, &(int){KEEPALIVE_RETRY_INTERVAL_SEC}, sizeof(int))) {
-        LOGERR("[set_keepalive] setsockopt(%d, TCP_KEEPINTVL): (%d) %s", sockfd, errno, errstring(errno));
-        exit(errno);
-    }
-}
 
 /* setsockopt(IPV6_V6ONLY) */
 void set_ipv6_only(int sockfd) {
@@ -288,9 +264,9 @@ int get_ipstr_family(const char *ipstr) {
 }
 
 /* set nofile limit (may require root privileges) */
-void set_nofile_limit(rlim_t nofile) {
+void set_nofile_limit(size_t nofile) {
     if (setrlimit(RLIMIT_NOFILE, &(struct rlimit){nofile, nofile}) < 0) {
-        LOGERR("[set_nofile_limit] setrlimit(nofile, %lu): (%d) %s", (long unsigned)nofile, errno, errstring(errno));
+        LOGERR("[set_nofile_limit] setrlimit(nofile, %zu): (%d) %s", nofile, errno, errstring(errno));
         exit(errno);
     }
 }
@@ -322,13 +298,15 @@ void run_as_user(const char *username, char *const argv[]) {
         exit(errno);
     }
 
+    if (!argv) return;
+
     static char exec_file_abspath[PATH_MAX] = {0};
     if (readlink("/proc/self/exe", exec_file_abspath, PATH_MAX - 1) < 0) {
         LOGERR("[run_as_user] failed to get the abspath of execfile: (%d) %s", errno, errstring(errno));
         exit(errno);
     }
 
-    if (argv && execv(exec_file_abspath, argv) < 0) {
+    if (execv(exec_file_abspath, argv) < 0) {
         LOGERR("[run_as_user] failed to call execv(%s, args): (%d) %s", exec_file_abspath, errno, errstring(errno));
         exit(errno);
     }
